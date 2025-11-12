@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { useProductStates } from "../api/getProductStates";
 import { useMarketplaceSummary } from "../api/getMarketplaceSummary";
@@ -38,6 +38,8 @@ const Index = () => {
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedTenantId, setSelectedTenantId] = useState(null);
   const [selectedOrderState, setSelectedOrderState] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleChangeView = useCallback((nextView) => {
     setActiveView((current) =>
@@ -108,6 +110,30 @@ const Index = () => {
     token,
   ]);
 
+  const handleToggleSidebarCollapse = useCallback(() => {
+    setIsSidebarCollapsed((prev) => !prev);
+  }, []);
+
+  const handleOpenSidebar = useCallback(() => {
+    setIsSidebarOpen(true);
+  }, []);
+
+  const handleCloseSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
+  useEffect(() => {
+    const updateSidebarState = () => {
+      if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    updateSidebarState();
+    window.addEventListener("resize", updateSidebarState);
+    return () => window.removeEventListener("resize", updateSidebarState);
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 lg:flex">
       <Sidebar
@@ -119,9 +145,18 @@ const Index = () => {
         showTenantFilter={true}
         activeOrderState={selectedOrderState}
         onChangeOrderState={setSelectedOrderState}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={setIsSidebarCollapsed}
+        isMobileOpen={isSidebarOpen}
+        onCloseMobile={handleCloseSidebar}
       />
       <div className="flex flex-1 flex-col">
-        <Navbar user={user} />
+        <Navbar
+          user={user}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebarCollapse={handleToggleSidebarCollapse}
+          onToggleMobileSidebar={handleOpenSidebar}
+        />
         <div className="flex-1 px-4 pb-10 pt-6 sm:px-6 lg:px-8">
           <main className="mx-auto w-full max-w-6xl">
             <ActiveViewComponent {...viewProps} />
