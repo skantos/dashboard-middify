@@ -7,6 +7,7 @@ const Dashboard = ({
   tenants = [],
   marketplaceTenants = [],
   isAggregated = true,
+  onSelectOrderState = null,
 }) => {
   let content;
 
@@ -27,7 +28,11 @@ const Dashboard = ({
   } else {
     content = (
       <div className="space-y-6">
-        <CardsStates tenants={tenants} isAggregated={isAggregated} />
+        <CardsStates
+          tenants={tenants}
+          isAggregated={isAggregated}
+          onSelectState={onSelectOrderState}
+        />
 
         <CardMarketplace
           tenants={marketplaceTenants}

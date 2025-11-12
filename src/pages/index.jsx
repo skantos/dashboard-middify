@@ -50,6 +50,14 @@ const Index = () => {
   const isLoading = tenantsLoading || marketplaceLoading || userLoading;
   const error = tenantsError || marketplaceError || userError;
 
+  const handleSelectOrderState = useCallback(
+    (stateId) => {
+      setSelectedOrderState(stateId ?? null);
+      setActiveView("orders");
+    },
+    [setActiveView, setSelectedOrderState]
+  );
+
   const filteredTenants = useMemo(() => {
     if (selectedTenantId) {
       return (tenants || []).filter(
@@ -96,6 +104,7 @@ const Index = () => {
       tenants: filteredTenants,
       marketplaceTenants: filteredMarketplaceTenants,
       isAggregated: selectedTenantId === null,
+      onSelectOrderState: handleSelectOrderState,
     };
   }, [
     activeView,
@@ -157,7 +166,7 @@ const Index = () => {
           onToggleSidebarCollapse={handleToggleSidebarCollapse}
           onToggleMobileSidebar={handleOpenSidebar}
         />
-        <div className="flex-1 px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+        <div className="flex-1 px-4 pb-10 sm:px-6 lg:px-8">
           <main className="mx-auto w-full max-w-6xl">
             <ActiveViewComponent {...viewProps} />
           </main>
