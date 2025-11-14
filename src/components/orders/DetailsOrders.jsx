@@ -1,0 +1,199 @@
+import { useMemo, useState } from "react";
+import PropTypes from "prop-types";
+import { useOrderDetails } from "../../api/orders/getDetailsOrders";
+import PanelOne from "./details/PanelOne";
+import PanelTwo from "./details/PanelTwo";
+import PanelThree from "./details/PanelThree";
+import PanelFour from "./details/PanelFour";
+import PanelFive from "./details/PanelFive";
+import PanelSix from "./details/PanelSix";
+import { formatText } from "./details/formatters";
+
+const TABS = [
+  { id: "panel1", label: "Resumen" },
+  { id: "panel2", label: "Items" },
+  { id: "panel3", label: "Envío" },
+  { id: "panel4", label: "Cliente" },
+  { id: "panel5", label: "Documentos" },
+  { id: "panel6", label: "Etapas" },
+];
+
+const buildFallbackPanels = (order) => {
+  if (!order) {
+    return null;
+  }
+
+  const marketplace = order.marketPlace ?? {};
+  const stages = Array.isArray(order.stages) ? order.stages : null;
+  return {
+    panel_1: {
+      orderId: marketplace.orderId ?? order.orderId ?? null,
+      idOrdenMarket: marketplace.idOrdenMarket ?? null,
+      nombre: marketplace.nombre ?? order.tennantName ?? order.tenantName ?? null,
+      creation: marketplace.creation ?? order.creation ?? null,
+      lastUpdate: marketplace.lastUpdate ?? order.lastUpdate ?? null,
+      status: marketplace.status ?? order.status ?? null,
+      attempts: marketplace.attempts ?? order.attempts ?? null,
+      statusOrder: order.status ?? marketplace.status ?? null,
+      message: order.message ?? marketplace.message ?? null,
+      errorDetail: marketplace.errorDetail ?? order.errorDetail ?? null,
+      subTotal: marketplace.subTotal ?? order.subTotal ?? null,
+      discounts: marketplace.discounts ?? order.discounts ?? [],
+      total: marketplace.total ?? order.total ?? null,
+    },
+    panel_2: null,
+    panel_3: null,
+    panel_4: order.customer ?? null,
+    panel_5: order.documents ?? null,
+    panel_6: stages ? { stages } : null,
+  };
+};
+
+const DetailsOrders = ({ token, orderId, fallbackOrder, onClose }) => {
+  const { details, loading, error } = useOrderDetails(token, orderId, {
+    enabled: Boolean(token && orderId),
+  });
+
+  const resolvedPanels = useMemo(() => {
+    if (details) {
+      return details;
+    }
+    return buildFallbackPanels(fallbackOrder);
+  }, [details, fallbackOrder]);
+
+  const [activeTab, setActiveTab] = useState(TABS[0].id);
+
+  const handleGoBack = () => {
+    onClose();
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold text-slate-800">
+              Detalles de la orden
+            </h1>
+            <p className="text-sm text-slate-500">
+              Consulta la información organizada por paneles. Los campos sin datos
+              muestran “Sin datos”.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+              ID: {formatText(orderId ?? fallbackOrder?._id ?? fallbackOrder?.id)}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              Marketplace:{" "}
+              {formatText(
+                resolvedPanels?.panel_1?.nombre ??
+                  fallbackOrder?.marketPlace?.nombre
+              )}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
+              Estado:{" "}
+              {formatText(
+                resolvedPanels?.panel_1?.statusOrder ?? fallbackOrder?.status
+              )}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {!orderId && (
+          <p className="px-6 py-6 text-sm text-slate-600">
+            Selecciona una orden desde la tabla para visualizar sus detalles.
+          </p>
+        )}
+
+        {orderId && loading && (
+          <p className="px-6 py-6 text-sm text-slate-600">
+            Cargando detalles de la orden...
+          </p>
+        )}
+
+        {orderId && !loading && error && (
+          <div className="mx-6 mt-6 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            Error al cargar los detalles desde la API: {error.message}. Se muestra la
+            información disponible localmente.
+          </div>
+        )}
+
+        {orderId && !loading && resolvedPanels && (
+          <div className="px-6 pb-6">
+            <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                    activeTab === tab.id
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "text-slate-500 hover:bg-slate-100"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="pt-6">
+              {activeTab === "panel1" && (
+                <PanelOne
+                  data={resolvedPanels.panel_1}
+                  fallbackOrder={fallbackOrder}
+                  orderId={orderId}
+                />
+              )}
+              {activeTab === "panel2" && (
+                <PanelTwo data={resolvedPanels.panel_2} />
+              )}
+              {activeTab === "panel3" && (
+                <PanelThree data={resolvedPanels.panel_3} />
+              )}
+              {activeTab === "panel4" && (
+                <PanelFour data={resolvedPanels.panel_4} />
+              )}
+              {activeTab === "panel5" && (
+                <PanelFive data={resolvedPanels.panel_5} />
+              )}
+              {activeTab === "panel6" && (
+                <PanelSix data={resolvedPanels.panel_6} />
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div>
+        <button
+          type="button"
+          onClick={handleGoBack}
+          className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          Volver a la lista de órdenes
+        </button>
+      </div>
+    </div>
+  );
+};
+
+DetailsOrders.propTypes = {
+  token: PropTypes.string,
+  orderId: PropTypes.string,
+  fallbackOrder: PropTypes.object,
+  onClose: PropTypes.func,
+};
+
+DetailsOrders.defaultProps = {
+  token: null,
+  orderId: null,
+  fallbackOrder: null,
+  onClose: () => {},
+};
+
+export default DetailsOrders;
+
