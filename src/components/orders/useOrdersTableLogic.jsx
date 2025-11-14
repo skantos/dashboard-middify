@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useOrdersByState } from "../../api/orders/getOrdersByState";
+import {
+  useOrdersByState,
+  getOrdersByState,
+} from "../../api/orders/getOrdersByState";
 import {
   formatCurrency,
   formatDateTime,
@@ -9,6 +12,9 @@ import {
 } from "./helpers";
 
 const PAGE_SIZE_OPTIONS_BASE = [10, 20, 50, 100];
+const SEARCH_PAGE_SIZE = 500;
+const MAX_SEARCH_RECORDS = 2000;
+const MAX_SEARCH_PAGES = 10;
 
 export const useOrdersTableLogic = ({
   token = null,
@@ -20,6 +26,13 @@ export const useOrdersTableLogic = ({
   const [page, setPage] = useState(1);
   const [selectedRowIds, setSelectedRowIds] = useState(() => new Set());
   const [searchTerm, setSearchTerm] = useState("");
+  const [clientPagination, setClientPagination] = useState({
+    page: 0,
+    pageSize: 20,
+  });
+  const [allOrdersCache, setAllOrdersCache] = useState(() => new Map());
+  const [allOrdersLoading, setAllOrdersLoading] = useState(false);
+  const [allOrdersError, setAllOrdersError] = useState(null);
 
   const apiStatus = selectedOrderState
     ? selectedOrderState.replace(/_/g, " ")
@@ -37,8 +50,6 @@ export const useOrdersTableLogic = ({
   }, [selectedTenantId, selectedOrderState]);
 
   const totalPagesFromMeta = meta?.totalPages ?? null;
-  const resolvedPageSize =
-    meta?.pageSize && meta.pageSize > 0 ? meta.pageSize : pageSize;
   const currentPage = meta?.page ?? page;
   const displayOrders = Array.isArray(orders) ? orders : [];
 
@@ -56,12 +67,115 @@ export const useOrdersTableLogic = ({
   }, [pageSize]);
 
   const normalizedSearch = searchTerm.trim().toLowerCase();
+  const isSearching = Boolean(normalizedSearch);
+
+  const cacheKey = useMemo(
+    () =>
+      JSON.stringify({
+        tenantId: selectedTenantId ?? null,
+        status: apiStatus ?? null,
+      }),
+    [selectedTenantId, apiStatus]
+  );
+  const cachedEntry = allOrdersCache.get(cacheKey) ?? null;
+  const cachedOrders = cachedEntry?.orders ?? null;
+
+  useEffect(() => {
+    if (!isSearching) {
+      return;
+    }
+    setClientPagination((prev) => ({
+      page: 0,
+      pageSize: prev.pageSize,
+    }));
+  }, [isSearching, normalizedSearch]);
+
+  useEffect(() => {
+    if (!isSearching) {
+      setClientPagination((prev) => ({
+        page: prev.page,
+        pageSize,
+      }));
+    }
+  }, [isSearching, pageSize]);
+
+  useEffect(() => {
+    if (!token || !isSearching || cachedOrders) {
+      return;
+    }
+    let cancelled = false;
+    const loadAllOrders = async () => {
+      setAllOrdersLoading(true);
+      setAllOrdersError(null);
+      try {
+        const collected = [];
+        let nextPage = 1;
+        let totalPages = 1;
+        let pagesFetched = 0;
+        let reachedLimit = false;
+        do {
+          const response = await getOrdersByState({
+            token,
+            tenantId: selectedTenantId ?? undefined,
+            status: apiStatus ?? undefined,
+            page: nextPage,
+            pageSize: SEARCH_PAGE_SIZE,
+          });
+          const fetched = Array.isArray(response?.orders)
+            ? response.orders
+            : [];
+          collected.push(...fetched);
+          totalPages = response?.totalPages ?? nextPage;
+          nextPage += 1;
+          pagesFetched += 1;
+          if (fetched.length === 0) {
+            break;
+          }
+          if (
+            collected.length >= MAX_SEARCH_RECORDS ||
+            pagesFetched >= MAX_SEARCH_PAGES
+          ) {
+            reachedLimit = true;
+            break;
+          }
+        } while (!cancelled && nextPage <= totalPages);
+
+        if (!cancelled) {
+          setAllOrdersCache((prev) => {
+            const next = new Map(prev);
+            next.set(cacheKey, {
+              orders: collected,
+              complete: !reachedLimit && nextPage > totalPages,
+            });
+            return next;
+          });
+        }
+      } catch (fetchError) {
+        if (!cancelled) {
+          setAllOrdersError(fetchError);
+        }
+      } finally {
+        if (!cancelled) {
+          setAllOrdersLoading(false);
+        }
+      }
+    };
+
+    loadAllOrders();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, isSearching, cachedOrders, cacheKey, selectedTenantId, apiStatus]);
+
+  const baseOrders =
+    isSearching && cachedOrders ? cachedOrders : displayOrders;
 
   const filteredOrders = useMemo(() => {
     if (!normalizedSearch) {
-      return displayOrders;
+      return baseOrders;
     }
-    return displayOrders.filter((order) => {
+    return baseOrders.filter((order) => {
       try {
         return JSON.stringify(order)
           .toLowerCase()
@@ -70,7 +184,7 @@ export const useOrdersTableLogic = ({
         return false;
       }
     });
-  }, [displayOrders, normalizedSearch]);
+  }, [baseOrders, normalizedSearch]);
 
   const dataGridRows = useMemo(() => {
     return filteredOrders.map((order, index) => {
@@ -126,10 +240,7 @@ export const useOrdersTableLogic = ({
     });
   }, []);
 
-  const allRowIds = useMemo(
-    () => dataGridRows.map((row) => row.id),
-    [dataGridRows]
-  );
+  const allRowIds = useMemo(() => dataGridRows.map((row) => row.id), [dataGridRows]);
 
   const allSelected = useMemo(() => {
     if (allRowIds.length === 0) {
@@ -262,16 +373,22 @@ export const useOrdersTableLogic = ({
     [allSelected, handleToggleAllRows, handleToggleRowSelection, selectedRowIds]
   );
 
-  const paginationModel = useMemo(
-    () => ({
+  const paginationModel = useMemo(() => {
+    if (isSearching) {
+      return clientPagination;
+    }
+    return {
       page: Math.max((currentPage ?? 1) - 1, 0),
       pageSize,
-    }),
-    [currentPage, pageSize]
-  );
+    };
+  }, [clientPagination, currentPage, pageSize, isSearching]);
 
   const handlePaginationModelChange = useCallback(
     (model) => {
+      if (isSearching) {
+        setClientPagination(model);
+        return;
+      }
       const nextPage = model.page + 1;
       if (nextPage !== page) {
         setPage(nextPage);
@@ -280,10 +397,14 @@ export const useOrdersTableLogic = ({
         setPageSize(model.pageSize);
       }
     },
-    [page, pageSize]
+    [isSearching, page, pageSize]
   );
 
-  const rowCount = dataGridRows.length;
+  const rowCount = isSearching
+    ? dataGridRows.length
+    : Number.isFinite(Number(meta?.total))
+    ? Number(meta?.total)
+    : dataGridRows.length;
 
   const handleRowClick = useCallback(
     (params) => {
@@ -294,21 +415,35 @@ export const useOrdersTableLogic = ({
     [onSelectOrder]
   );
 
+  const paginatedRows = useMemo(() => {
+    if (!isSearching) {
+      return dataGridRows;
+    }
+    const start = paginationModel.page * paginationModel.pageSize;
+    const end = start + paginationModel.pageSize;
+    return dataGridRows.slice(start, end);
+  }, [dataGridRows, isSearching, paginationModel]);
+
   const handleSearchChange = useCallback((event) => {
     setSearchTerm(event.target.value);
   }, []);
 
+  const combinedLoading =
+    loading || (isSearching && !cachedOrders && allOrdersLoading);
+  const combinedError = allOrdersError ?? error;
+
   return {
-    loading,
-    error,
+    loading: combinedLoading,
+    error: combinedError,
     selectedStateLabel: getSelectedStateLabel(selectedOrderState),
     searchTerm,
     grid: {
-      rows: dataGridRows,
+      rows: paginatedRows,
       columns,
-      loading,
+      loading: combinedLoading,
       paginationModel,
       onPaginationModelChange: handlePaginationModelChange,
+      paginationMode: isSearching ? "client" : "server",
       pageSizeOptions,
       rowCount,
       onRowClick: handleRowClick,
@@ -316,5 +451,4 @@ export const useOrdersTableLogic = ({
     onSearchChange: handleSearchChange,
   };
 };
-
 

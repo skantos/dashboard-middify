@@ -27,6 +27,7 @@ const OrdersTable = ({
           columns={grid.columns}
           loading={grid.loading}
           error={error}
+          paginationMode={grid.paginationMode}
           paginationModel={grid.paginationModel}
           onPaginationModelChange={grid.onPaginationModelChange}
           pageSizeOptions={grid.pageSizeOptions}

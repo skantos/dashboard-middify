@@ -13,6 +13,7 @@ const OrdersTableGrid = ({
   columns,
   loading,
   error,
+  paginationMode,
   paginationModel,
   onPaginationModelChange,
   pageSizeOptions,
@@ -45,7 +46,7 @@ const OrdersTableGrid = ({
               rows={rows}
               columns={columns}
               loading={loading}
-              paginationMode="server"
+              paginationMode={paginationMode}
               paginationModel={paginationModel}
               onPaginationModelChange={onPaginationModelChange}
               pageSizeOptions={pageSizeOptions}
@@ -100,6 +101,7 @@ OrdersTableGrid.propTypes = {
   columns: PropTypes.arrayOf(PropTypes.object).isRequired,
   loading: PropTypes.bool.isRequired,
   error: PropTypes.oneOfType([PropTypes.bool, PropTypes.object]),
+  paginationMode: PropTypes.oneOf(["client", "server"]).isRequired,
   paginationModel: PropTypes.shape({
     page: PropTypes.number.isRequired,
     pageSize: PropTypes.number.isRequired,

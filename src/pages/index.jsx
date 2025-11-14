@@ -8,7 +8,7 @@ import Sidebar from "../navbar/sidebar";
 import Dashboard from "./Dashboard";
 import Stores from "./Stores";
 import OrdersTable from "./OrdersTable";
-import DetailsOrders from "../components/orders/DetailsOrders";
+import DetailsOrders from "./DetailsOrders";
 
 const VIEW_REGISTRY = {
   dashboard: Dashboard,
