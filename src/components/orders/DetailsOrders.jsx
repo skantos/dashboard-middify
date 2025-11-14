@@ -68,39 +68,7 @@ const DetailsOrders = ({ token, orderId, fallbackOrder, onClose }) => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-semibold text-slate-800">
-              Detalles de la orden
-            </h1>
-            <p className="text-sm text-slate-500">
-              Consulta la información organizada por paneles. Los campos sin datos
-              muestran “Sin datos”.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-              ID: {formatText(orderId ?? fallbackOrder?._id ?? fallbackOrder?.id)}
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              Marketplace:{" "}
-              {formatText(
-                resolvedPanels?.panel_1?.nombre ??
-                  fallbackOrder?.marketPlace?.nombre
-              )}
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-              Estado:{" "}
-              {formatText(
-                resolvedPanels?.panel_1?.statusOrder ?? fallbackOrder?.status
-              )}
-            </span>
-          </div>
-        </div>
-      </header>
-
+    <div className="flex flex-col pt-6 gap-6">
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         {!orderId && (
           <p className="px-6 py-6 text-sm text-slate-600">
